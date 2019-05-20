@@ -1,0 +1,43 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.1'
+    }
+}
+
+apply plugin: 'groovy'
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'idea'
+apply plugin: 'application'
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    compile 'org.codehaus.groovy:groovy:2.5.7'
+}
+
+mainClassName = 'example.App'
+
+compileGroovy {
+    configure(groovyOptions) {
+        configurationScript = file("$rootDir/config/groovy/compiler-config.groovy")
+    }
+}
+
+task finalize << {
+    println "Generating reflection configuration with native-image-agent..."
+    def javaAgentProcess = ["java", "-agentlib:native-image-agent=config-output-dir=config/native-image/", "-jar", "build/libs/graalvm-groovy-closures-all.jar"].execute()
+    javaAgentProcess.waitFor()
+
+    println "Cleaning up reflection configuration class"
+    def updateReflectProcess = ["groovy", "./config/groovy/removeFromJson.groovy", "./config/native-image/reflect-config.json", "java.lang.reflect.Executable"].execute()
+    updateReflectProcess.waitFor()
+
+    println "Done!"
+}
+
+shadowJar.finalizedBy(finalize)
