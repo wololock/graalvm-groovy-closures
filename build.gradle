@@ -1,3 +1,6 @@
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+
 buildscript {
     repositories {
         jcenter()
@@ -34,8 +37,17 @@ task finalize << {
     javaAgentProcess.waitFor()
 
     println "Cleaning up reflection configuration class"
-    def updateReflectProcess = ["groovy", "./config/groovy/removeFromJson.groovy", "./config/native-image/reflect-config.json", "java.lang.reflect.Executable"].execute()
-    updateReflectProcess.waitFor()
+    def classes = [
+            "java.lang.reflect.Executable"
+    ]
+    def file = new File("./config/native-image/reflect-config.json")
+    def root = new JsonSlurper().parse(file)
+
+    def filtered = root.findAll { !(it.name in classes) }
+
+    file.newWriter().withWriter {
+        it << JsonOutput.prettyPrint(JsonOutput.toJson(filtered)).replaceAll("    ", "  ")
+    }
 
     println "Done!"
 }
